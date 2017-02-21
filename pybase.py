@@ -34,7 +34,7 @@ class QBConn:
 
     # Adds the appropriate fields to the request and sends it to QB
     # Takes a dict of parameter:value pairs and the url extension (main or your table ID, mostly)
-    def request(self, params, url_ext):
+    def request(self, params, url_ext, raw=False):
         url = self.url
         url += url_ext
 
@@ -46,14 +46,20 @@ class QBConn:
         params['apptoken'] = self.token
         params['realmhost'] = self.realm
         urlparams = urllib.parse.urlencode(params)
+        #print(urlparams)
         resp = urllib.request.FancyURLopener().open(url+"?"+urlparams).read()
-        if re.match('^\<\?xml version=', resp.decode("utf-8")) == None:
-            print("No useful data received")
-            self.error = -1  # No XML data returned
+        #print(resp.decode("utf-8"))
+        if raw:
+            resp_string = resp.decode("utf-8")
+            return resp_string
         else:
-            tree = elementree.fromstring(resp)
-            self.error = int(tree.find('errcode').text)
-            return tree
+            if re.match('^\<\?xml version=', resp.decode("utf-8")) == None:
+                print("No useful data received")
+                self.error = -1  # No XML data returned
+            else:
+                tree = elementree.fromstring(resp)
+                self.error = int(tree.find('errcode').text)
+                return tree
 
     # Creates a record with the given data in the table specified by tableID
     # Takes a tableID (you can get this using qb.tables["yourtable"])
@@ -66,7 +72,7 @@ class QBConn:
                 params["_fid_" + fields[field]] = data[field]
         return self.request(params, tableID)
 
-    # Updates a reord with the given data
+    # Updates a record with the given data
     # Takes the record's table ID, record ID, a dict containing field:newvalue pairs, and an optional dict with param:value pairs
     def editRecord(self, tableID, rid, newdata, options={}):
         params = {'act': 'API_EditRecord', 'rid': rid}
@@ -89,6 +95,13 @@ class QBConn:
     def purgeRecords(self, tableID, query):
         params = {'act': 'API_PurgeRecords', 'query': query}
         return self.request(params, tableID)
+
+    # Gets data by query or query id
+    # Takes the record's table ID, record ID, a dict with param:value pairs as option
+    def genresultsTable(self, tableID, options={}):
+        params = {'act': 'API_GenResultsTable'}
+        params = dict(params, **options)
+        return self.request(params, tableID, True)
 
     # Returns a dict containing fieldname:fieldid pairs
     # Field names will have spaces replaced with not spaces
