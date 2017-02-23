@@ -103,6 +103,13 @@ class QBConn:
         params = dict(params, **options)
         return self.request(params, tableID, True)
 
+    # Import from csv into the records
+    # Takes the record's table ID, a dict containing field field ID, record ID and option
+    def importFromCSV(self, tableID, options={}):
+        params = {'act': 'API_ImportFromCSV'}
+        params = dict(params, **options)
+        return self.request(params, tableID, True)
+
     # Returns a dict containing fieldname:fieldid pairs
     # Field names will have spaces replaced with not spaces
     def getFields(self, tableID):
