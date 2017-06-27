@@ -61,6 +61,35 @@ class QBConn:
                 self.error = int(tree.find('errcode').text)
                 return tree
 
+    # Adds the appropriate fields to the request and sends it to QB with post.
+    # Takes a dict of parameter:value pairs and the url extension (main or your table ID, mostly)
+    def post_request(self, params, url_ext, raw=False):
+        url = self.url
+        url += url_ext
+
+        if self.user_token:
+            params['usertoken'] = self.user_token
+        else:
+            params['ticket'] = self.ticket
+
+        params['apptoken'] = self.token
+        params['realmhost'] = self.realm
+        urlparams = urllib.parse.urlencode(params)
+        urlparams = urlparams.encode('ascii')
+        resp = urllib.request.FancyURLopener().open(url, urlparams).read()
+        # print(resp.decode("utf-8"))
+        if raw:
+            resp_string = resp.decode("utf-8")
+            return resp_string
+        else:
+            if re.match('^\<\?xml version=', resp.decode("utf-8")) == None:
+                print("No useful data received")
+                self.error = -1  # No XML data returned
+            else:
+                tree = elementree.fromstring(resp)
+                self.error = int(tree.find('errcode').text)
+                return tree
+
     # Creates a record with the given data in the table specified by tableID
     # Takes a tableID (you can get this using qb.tables["yourtable"])
     # Also takes a dict containing field name:field value pairs
@@ -108,7 +137,7 @@ class QBConn:
     def importFromCSV(self, tableID, options={}):
         params = {'act': 'API_ImportFromCSV'}
         params = dict(params, **options)
-        return self.request(params, tableID, True)
+        return self.post_request(params, tableID, True)
 
     # Returns a dict containing fieldname:fieldid pairs
     # Field names will have spaces replaced with not spaces
