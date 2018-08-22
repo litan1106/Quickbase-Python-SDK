@@ -1,9 +1,11 @@
-import urllib.request
-import urllib.parse
-import urllib.error
-import xml.etree.ElementTree as elementree
+import pprint
 import re
-import string
+import urllib.error
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as elementree
+
+from lpsharedlib.encoding_util import detect_encoding
 
 
 class QBConn:
@@ -46,20 +48,10 @@ class QBConn:
         params['apptoken'] = self.token
         params['realmhost'] = self.realm
         urlparams = urllib.parse.urlencode(params)
-        #print(urlparams)
-        resp = urllib.request.FancyURLopener().open(url+"?"+urlparams).read()
-        #print(resp.decode("utf-8"))
-        if raw:
-            resp_string = resp.decode("utf-8")
-            return resp_string
-        else:
-            if re.match('^\<\?xml version=', resp.decode("utf-8")) == None:
-                print("No useful data received")
-                self.error = -1  # No XML data returned
-            else:
-                tree = elementree.fromstring(resp)
-                self.error = int(tree.find('errcode').text)
-                return tree
+        # print(urlparams)
+        resp = urllib.request.FancyURLopener().open(url + "?" + urlparams).read()
+
+        return self.__parse_response(raw, resp)
 
     # Adds the appropriate fields to the request and sends it to QB with post.
     # Takes a dict of parameter:value pairs and the url extension (main or your table ID, mostly)
@@ -75,16 +67,29 @@ class QBConn:
         params['apptoken'] = self.token
         params['realmhost'] = self.realm
         urlparams = urllib.parse.urlencode(params)
-        urlparams = urlparams.encode('ascii')
+
+        enc_result = detect_encoding(urlparams)
+        if enc_result['encoding'] is not None:
+            urlparams.encode(enc_result['encoding'])
+        else:
+            urlparams.encode('utf-8')
+
         resp = urllib.request.FancyURLopener().open(url, urlparams).read()
-        # print(resp.decode("utf-8"))
+
+        return self.__parse_response(raw, resp)
+
+    def __parse_response(self, raw, resp):
         if raw:
-            resp_string = resp.decode("utf-8")
-            return resp_string
+            enc_result = detect_encoding(resp)
+            if enc_result['encoding'] is not None:
+                return resp.decode(enc_result['encoding'])
+            else:
+                return resp.decode('utf-8')
         else:
             if re.match('^\<\?xml version=', resp.decode("utf-8")) == None:
                 print("No useful data received")
                 self.error = -1  # No XML data returned
+                return None
             else:
                 tree = elementree.fromstring(resp)
                 self.error = int(tree.find('errcode').text)
@@ -228,7 +233,7 @@ class QBConn:
                         slist += tfields[ordering] + "."
                     query['slist'] = slist[:len(slist) - 1]
                     query['options'] = (query['options'] + "." if 'options' in query else "") + "sortorder-" + (
-                    "A" if tokens[orderby + 2] == "ASC" else "D")
+                        "A" if tokens[orderby + 2] == "ASC" else "D")
                 except ValueError:
                     pass
                 except:
